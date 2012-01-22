@@ -1,0 +1,2 @@
+- When a method_missing comes in with a question mark at the end it should return true or false
+- Access outlines like hashes using brackets

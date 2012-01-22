@@ -1,0 +1,3 @@
+require 'outline'
+
+system('clear')
