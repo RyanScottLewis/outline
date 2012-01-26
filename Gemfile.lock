@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    outline (0.1.0)
+    outline (0.1.1)
       meta_tools (~> 0.2.6)
 
 GEM

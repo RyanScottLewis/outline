@@ -1,6 +1,12 @@
 require 'bundler/setup'
 require 'meta_tools'
 
+class Hash
+  def to_outline
+    
+  end
+end
+
 class Outline
   class ArgumentWithBlockError < StandardError
     def to_s; "You cannot give an argument with a block"; end
@@ -15,9 +21,14 @@ class Outline
     raise(TypeError, "opts[:data] must respond to :to_h or :to_hash or be nil") unless opts.nil? || opts.respond_to?(:to_hash) || opts.respond_to?(:to_h)
     
     opts = opts.to_hash
-    data = opts[:data].respond_to?(:to_hash) ? opts[:data].to_hash : opts[:data].to_h unless opts[:data].nil?
     
-    @parent, @data = opts[:parent], data
+    # Check to see if incoming data is already an outline
+    # if so, then turn it into a hash
+    
+    data = opts[:data].respond_to?(:to_hash) ? opts[:data].to_hash : opts[:data].to_h unless opts[:data].nil? || opts[:data].is_a?(Outline)
+    
+    @parent = opts[:parent]
+    @data = data
     
     instance_eval(&blk) if block_given?
   end
@@ -50,9 +61,14 @@ class Outline
   
   def to_h
     @data.inject({}) do |memo, (key, value)|
-      memo[key] = value.respond_to?(:to_h) ? value.to_h : value
+      memo[key] = value#.respond_to?(:to_h) ? value.to_h : value
       memo
     end
+  end
+  
+  def inspect
+    # "#<Outline:0x#{self.object_id.to_s(16)} @data=#{to_h}>"
+    "{O}#{to_h}"
   end
   
   # def to_json; end
