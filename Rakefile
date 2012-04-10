@@ -10,14 +10,85 @@ def notify(message)
   puts "   -> #{'%0.04f' % (Time.now - start_time)}s"
 end
 
-namespace :gem do
-  desc 'Update the VERSION file to the latest version'
-  task :update_version do
-    notify "updating VERSION to #{Outline::VERSION}" do
+VERSION_REGEXP = /VERSION = '((\d+)\.(\d+)\.(\d+))'/
+
+namespace :version do
+  desc 'Display the current version'
+  task :current do
+    puts File.read('VERSION')
+  end
+  
+  desc 'Update the version file to the latest version'
+  task :update_file do
+    notify "updating VERSION file to #{Outline::VERSION}" do
       File.open('VERSION', 'w+') { |f| f.print Outline::VERSION }
     end
   end
   
+  namespace :bump do
+    desc 'Bump the major version'
+    task :major do
+      data = File.read('lib/outline.rb')
+      
+      versions = { old: {}, new: {} }
+      versions[:old][:major], versions[:old][:minor], versions[:old][:patch] = data.match(VERSION_REGEXP).captures[1..-1].collect { |i| i.to_i }
+      versions[:new] = versions[:old].dup
+      versions[:new][:major] += 1
+      versions[:new][:minor] = 0
+      versions[:new][:patch] = 0
+      versions[:old][:string] = [ versions[:old][:major], versions[:old][:minor], versions[:old][:patch] ].join('.')
+      versions[:new][:string] = [ versions[:new][:major], versions[:new][:minor], versions[:new][:patch] ].join('.')
+      
+      notify "updating version from #{versions[:old][:string]} to #{versions[:new][:string]}" do
+        File.open('lib/outline.rb', 'w+') { |f| f.print data.gsub(VERSION_REGEXP, "VERSION = '#{versions[:new][:string]}'") }
+        Outline::VERSION.replace(versions[:new][:string])
+      end
+      
+      Rake::Task["version:update_file"].execute
+    end
+    
+    desc 'Bump the minor version'
+    task :minor do
+      data = File.read('lib/outline.rb')
+      
+      versions = { old: {}, new: {} }
+      versions[:old][:major], versions[:old][:minor], versions[:old][:patch] = data.match(VERSION_REGEXP).captures[1..-1].collect { |i| i.to_i }
+      versions[:new] = versions[:old].dup
+      versions[:new][:minor] += 1
+      versions[:new][:patch] = 0
+      versions[:old][:string] = [ versions[:old][:major], versions[:old][:minor], versions[:old][:patch] ].join('.')
+      versions[:new][:string] = [ versions[:new][:major], versions[:new][:minor], versions[:new][:patch] ].join('.')
+      
+      notify "updating version from #{versions[:old][:string]} to #{versions[:new][:string]}" do
+        File.open('lib/outline.rb', 'w+') { |f| f.print data.gsub(VERSION_REGEXP, "VERSION = '#{versions[:new][:string]}'") }
+        Outline::VERSION.replace(versions[:new][:string])
+      end
+      
+      Rake::Task["version:update_file"].execute
+    end
+    
+    desc 'Bump the patch version'
+    task :patch do
+      data = File.read('lib/outline.rb')
+      
+      versions = { old: {}, new: {} }
+      versions[:old][:major], versions[:old][:minor], versions[:old][:patch] = data.match(VERSION_REGEXP).captures[1..-1].collect { |i| i.to_i }
+      versions[:new] = versions[:old].dup
+      versions[:new][:patch] += 1
+      versions[:old][:string] = [ versions[:old][:major], versions[:old][:minor], versions[:old][:patch] ].join('.')
+      versions[:new][:string] = [ versions[:new][:major], versions[:new][:minor], versions[:new][:patch] ].join('.')
+      
+      notify "updating version from #{versions[:old][:string]} to #{versions[:new][:string]}" do
+        File.open('lib/outline.rb', 'w+') { |f| f.print data.gsub(VERSION_REGEXP, "VERSION = '#{versions[:new][:string]}'") }
+        Outline::VERSION.replace(versions[:new][:string])
+      end
+      
+      Rake::Task["version:update_file"].execute
+    end
+  end
+end
+
+namespace :gem do
   desc 'Build the gem'
   task :build do
     notify 'building the gem' do
@@ -40,7 +111,7 @@ namespace :gem do
   end
   
   desc 'Update VERSION, build the gem, push the gem, then move the gem to the pkg directory'
-  task deploy: [:update_version, :build, :push, :move]
+  task deploy: [:build, :push, :move]
 end
 
 desc "Run all specs"
