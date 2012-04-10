@@ -1,3 +1,0 @@
-require 'outline'
-
-system('clear')

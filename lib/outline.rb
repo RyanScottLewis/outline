@@ -3,72 +3,91 @@ require 'meta_tools'
 
 class Hash
   def to_outline
+    convert_data = Proc.new do |data|
+      data.each_with_object({}) do |(key, value), memo|
+        if value.respond_to?(:to_hash) || value.respond_to?(:to_h)
+          value = value.respond_to?(:to_hash) ? value.to_hash : value.to_h
+          value = value.to_outline
+        end
+        
+        memo[key] = value
+      end
+    end
     
+    data = convert_data[ self ]
+    
+    Outline.new(data: data)
   end
 end
 
 class Outline
-  class ArgumentWithBlockError < StandardError
-    def to_s; "You cannot give an argument with a block"; end
-  end
+  VERSION = '0.2.0'
   
+  # It's as if we are subclassing BasicObject, but without the loss of context (and object_id):
+  (Object.instance_methods - BasicObject.instance_methods).each { |meth| remove_method(meth) unless [:object_id].include?(meth) rescue nil }
   include MetaTools
   
   attr_reader :parent, :data
   
   def initialize(opts={}, &blk)
     raise(TypeError, "opts must respond to :to_hash or be nil") unless opts.nil? || opts.respond_to?(:to_hash)
-    raise(TypeError, "opts[:data] must respond to :to_h or :to_hash or be nil") unless opts.nil? || opts.respond_to?(:to_hash) || opts.respond_to?(:to_h)
+    raise(TypeError, "opts[:data] must respond to :to_h or :to_hash or be nil") unless opts[:data].nil? || opts[:data].respond_to?(:to_hash) || opts[:data].respond_to?(:to_h)
     
     opts = opts.to_hash
-    
-    # Check to see if incoming data is already an outline
-    # if so, then turn it into a hash
-    
-    data = opts[:data].respond_to?(:to_hash) ? opts[:data].to_hash : opts[:data].to_h unless opts[:data].nil? || opts[:data].is_a?(Outline)
+    data = opts[:data].respond_to?(:to_hash) ? opts[:data].to_hash : opts[:data].to_h unless opts[:data].nil?
     
     @parent = opts[:parent]
     @data = data
+    @methods = []
     
-    instance_eval(&blk) if block_given?
+    instance_eval(&blk) unless blk.nil?
   end
   
   def method_missing(meth, *args, &blk)
     meth = meth.to_s.gsub(/=$/, '').to_sym if meth =~ /=$/
     
-    meta_def(meth) do |value=nil, &blk|
-      block_given, value_given = !blk.nil?, !value.nil?
-      @data ||= {}
+    unless @methods.include?(meth)
+      @methods << meth
       
-      if !block_given && !value_given
-        @data[meth] = Outline.new(parent: self) unless @data.has_key?(meth)
+      meta_def(meth) do |*values, &blk|
+        block_given, values_given = !blk.nil?, !values.empty?
+        @data ||= {}
         
-        @data[meth]
-      elsif block_given && value_given
-        raise ArgumentWithBlockError
-      elsif !block_given && value_given
-        @data[meth] = value
-      elsif block_given && !value_given
-        @data[meth] = Outline.new(parent: self, &blk)
+        if !block_given && !values_given
+          @data[meth] = Outline.new(parent: self) unless @data.has_key?(meth)
+          
+          @data[meth]
+        elsif block_given && values_given
+          data = values.delete_at(-1) if values.last.respond_to?(:to_hash) || values.last.respond_to?(:to_h)
+          data = { value: values.length == 1 ? values.first : values }.merge!(data || {})
+          
+          @data[meth] = Outline.new(parent: self, data: data, &blk)
+        elsif !block_given && values_given
+          data = values.delete_at(-1) if values.last.respond_to?(:to_hash) || values.last.respond_to?(:to_h)
+          
+          if data.nil?
+            @data[meth] = values.length == 1 ? values.first : values
+          else
+            data = { value: values.length == 1 ? values.first : values }.merge!(data || {}) unless values.empty?
+            
+            @data[meth] = Outline.new(parent: self, data: data)
+          end
+        elsif block_given && !values_given
+          @data[meth] = Outline.new(parent: self, &blk)
+        end
       end
       
-    end unless methods.include?(meth)
+      meta_def("#{meth}=") { |value| __send__(meth, value) }
+    end
     
-    meta_def("#{meth}=") { |value| send(meth, value) }
-    
-    send(meth, *args, &blk)
+    __send__(meth, *args, &blk)
   end
   
   def to_h
-    @data.inject({}) do |memo, (key, value)|
-      memo[key] = value#.respond_to?(:to_h) ? value.to_h : value
-      memo
+    @data ||= {}
+    @data.each_with_object({}) do |(key, value), memo|
+      memo[key] = value.respond_to?(:to_h) ? value.to_h : value
     end
-  end
-  
-  def inspect
-    # "#<Outline:0x#{self.object_id.to_s(16)} @data=#{to_h}>"
-    "{O}#{to_h}"
   end
   
   # def to_json; end
