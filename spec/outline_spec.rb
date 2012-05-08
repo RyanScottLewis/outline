@@ -29,12 +29,6 @@ describe Outline do
     end
   end
   
-  describe 'VERSION' do
-    it "should be correct" do
-      Outline::VERSION.should == '0.2.0'
-    end
-  end
-  
   describe "getters" do
     it "should work" do
       config.testing.should == "testing"
@@ -82,6 +76,17 @@ describe Outline do
       config.from_outside.should == "Hello"
       config.from_outside = "Goodbye"
       config.data[:from_outside].should == "Goodbye"
+    end
+  end
+  
+  describe "#each" do
+    it "should work as expected" do
+      result = {}
+      config.each do |k, v|
+        result[k] = v
+      end
+      
+      result.should == config.to_h
     end
   end
   

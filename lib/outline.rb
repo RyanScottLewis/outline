@@ -1,5 +1,6 @@
 require 'bundler/setup'
 require 'meta_tools'
+require 'outline/version'
 
 class Hash
   def to_outline
@@ -21,11 +22,10 @@ class Hash
 end
 
 class Outline
-  VERSION = '0.2.0'
-  
   # It's as if we are subclassing BasicObject, but without the loss of context (and object_id):
   (Object.instance_methods - BasicObject.instance_methods).each { |meth| remove_method(meth) unless [:object_id].include?(meth) rescue nil }
   include MetaTools
+  include Enumerable
   
   attr_reader :parent, :data
   
@@ -81,6 +81,10 @@ class Outline
     end
     
     __send__(meth, *args, &blk)
+  end
+  
+  def each
+    to_h.each { |k, v| yield(k, v) }
   end
   
   def to_h
